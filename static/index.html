@@ -1,0 +1,316 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Live Chat</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background-color: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: calc(100vh - 20px);
+            max-height: 800px;
+            background: #222;
+            border: 2px solid white;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: #000;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            border-bottom: 1px solid white;
+            font-family: 'Helvetica Neue', 'Segoe UI', Arial, sans-serif;
+            font-weight: 100;
+            text-transform: uppercase;
+        }
+
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: #111;
+            color: white;
+        }
+
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #1a1a1a;
+            border-left: 3px solid white;
+            font-size: 13px;
+        }
+
+        .message-header {
+            font-weight: bold;
+            color: #ffff00;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+
+        .message-content {
+            margin-top: 3px;
+            color: white;
+            line-height: 1.4;
+        }
+
+        .message-time {
+            font-size: 10px;
+            color: #666;
+            margin-top: 3px;
+        }
+
+        .input-container {
+            display: flex;
+            padding: 15px;
+            background: #000;
+            border-top: 1px solid white;
+            gap: 10px;
+        }
+
+        #usernameInput {
+            width: 120px;
+            padding: 8px;
+            border: 1px solid white;
+            background: #111;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid white;
+            background: #111;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        #sendButton {
+            padding: 8px 15px;
+            background: white;
+            color: #000;
+            border: none;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        #sendButton:hover {
+            background: #ffff00;
+        }
+
+        .status {
+            padding: 8px;
+            text-align: center;
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .connected {
+            background: #003300;
+            color: white;
+            border-bottom: 1px solid white;
+        }
+
+        .disconnected {
+            background: #330000;
+            color: #ff0000;
+            border-bottom: 1px solid #ff0000;
+        }
+
+        input:focus, button:focus {
+            outline: 2px solid #ffff00;
+        }
+
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            body {
+                padding: 5px;
+            }
+            
+            .chat-container {
+                height: calc(100vh - 10px);
+                border-width: 1px;
+            }
+            
+            .chat-header {
+                padding: 10px;
+                font-size: 14px;
+                letter-spacing: 1px;
+            }
+            
+            .input-container {
+                padding: 10px;
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+            
+            #usernameInput {
+                width: 100px;
+                font-size: 12px;
+                min-height: 44px;
+            }
+            
+            #messageInput {
+                font-size: 12px;
+                min-height: 44px;
+            }
+            
+            #sendButton {
+                font-size: 12px;
+                padding: 12px 16px;
+                min-height: 44px;
+                min-width: 60px;
+            }
+            
+            .message {
+                margin-bottom: 8px;
+                padding: 6px;
+                font-size: 12px;
+            }
+            
+            .message-header {
+                font-size: 11px;
+            }
+            
+            .message-time {
+                font-size: 9px;
+            }
+            
+            .messages {
+                -webkit-overflow-scrolling: touch;
+            }
+            
+            input, button {
+                touch-action: manipulation;
+            }
+        }
+
+        /* Prevent zoom on input focus on iOS */
+        @media screen and (max-width: 768px) {
+            input[type="text"] {
+                font-size: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Chat It Up</h1>
+        </div>
+        
+        <div id="status" class="status disconnected">Connecting...</div>
+        
+        <div id="messages" class="messages">
+            <!-- Messages will appear here -->
+        </div>
+        
+        <div class="input-container">
+            <input type="text" id="usernameInput" placeholder="Username" value="User">
+            <input type="text" id="messageInput" placeholder="Type your message...">
+            <button id="sendButton">Send</button>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = '{{BASE_URL}}';
+        
+        // Automatically determine the correct WebSocket protocol
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+        
+        const ws = new WebSocket(`${wsProtocol}://${baseUrl}/ws`);
+        const messagesDiv = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const usernameInput = document.getElementById('usernameInput');
+        const sendButton = document.getElementById('sendButton');
+        const statusDiv = document.getElementById('status');
+
+        ws.onopen = function() {
+            statusDiv.textContent = 'Connected';
+            statusDiv.className = 'status connected';
+        };
+
+        ws.onclose = function() {
+            statusDiv.textContent = 'Disconnected';
+            statusDiv.className = 'status disconnected';
+        };
+
+        ws.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            displayMessage(message);
+        };
+
+        function displayMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            
+            // const date = new Date(message.timestamp * 1000);
+            // const timeString = date.toLocaleTimeString();
+            
+            messageDiv.innerHTML = `
+                <div class="message-header">${message.username}</div>
+                <div class="message-content">${message.body}</div>
+                <div class="message-time">${message.sent_at}</div>
+            `;
+            
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function sendMessage() {
+            const username = usernameInput.value.trim() || 'Anonymous';
+            const content = messageInput.value.trim();
+            
+            if (content && ws.readyState === WebSocket.OPEN) {
+                const message = {
+                    username: username,
+                    content: content
+                };
+                
+                ws.send(JSON.stringify(message));
+                messageInput.value = '';
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Focus on message input
+        messageInput.focus();
+    </script>
+</body>
+</html>
