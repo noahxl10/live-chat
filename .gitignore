@@ -1,1 +1,5 @@
 /target
+/test
+*.DS_Store
+.local/
+.cargo/
