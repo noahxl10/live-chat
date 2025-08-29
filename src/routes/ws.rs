@@ -33,10 +33,22 @@ async fn handle_socket(stream: WebSocket, state: AppState, username: String) {
 
   let (mut sender, mut receiver) = stream.split();
 
+  // Load and send chat history to the new client
+  match state.database.get_recent_messages(100).await {
+    Ok(messages) => {
+      for message in messages {
+        let json = message.to_json().unwrap();
+        if sender.send(Message::Text(json)).await.is_err() {
+          return;
+        }
+      }
+    }
+    Err(e) => {
+      println!("Failed to load chat history: {}", e);
+    }
+  }
+
   // send welcome package to specific client
-  // let msg = format!("Welcome to the chat, {}!", username);
-  // let json = serde_json::to_string(&msg).unwrap();
-  
   let username_clone = username.clone();
   let msg = ChatMessage::try_new(&username_clone, "Welcome to the chat!");
   
@@ -64,6 +76,7 @@ async fn handle_socket(stream: WebSocket, state: AppState, username: String) {
   
 
   // receive messages from the client and broadcast them to other clients
+  let database = state.database.clone();
   let receive_task = tokio::spawn(async move {
     // receive task is responsible for receiving messages from the client and broadcasting them to other clients
     
@@ -85,6 +98,12 @@ async fn handle_socket(stream: WebSocket, state: AppState, username: String) {
         let msg = received_msg.to_chat_message(username_clone.clone());
         if let Ok(message) = msg {
           println!("{}", username_clone);
+          
+          // Save message to database
+          if let Err(e) = database.save_message(&message).await {
+            println!("Failed to save message to database: {}", e);
+          }
+          
           let _ = tx.send(message);
         }
       }
